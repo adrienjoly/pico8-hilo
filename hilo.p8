@@ -6,7 +6,7 @@ function _init()
  deck=generate_random_deck()
  grids={generate_grid(),generate_grid()}
  state="player1"
- last_card=nil
+ last_card=draw_from_deck()
  new_card=nil
  sel_x=1
  sel_y=1
@@ -14,6 +14,7 @@ end
 
 function _update()
  print("state before: "..state)
+ check_hilos()
  if state=="player1" then
   -- pick new card or last card
   if btnp(❎) then
@@ -52,7 +53,7 @@ function _update()
 	 local selected_card=grids[1][sel_y][sel_x]
 	 if btnp(❎) then
 	  state="player1"
-	 elseif btnp(🅾️) and not selected_card.visible then
+	 elseif btnp(🅾️) then
 	  set_card_in(grids[1],last_card,sel_x,sel_y)
 	  state="player2"
 	 end
@@ -71,6 +72,75 @@ function _update()
   end
 	end
  print("state after: "..state)
+end
+
+function check_hilos()
+ for player=1,2 do
+  local grid=grids[player]
+  check_hilos_for(grid)
+ end
+end
+ 
+function check_hilos_for(grid)
+ if #grid<3 and #grid[1]<3 then
+  return
+ end
+ -- check horizontal hilos
+ if #grid[1]==3 then
+  for row in all(grid) do
+   if is_hilo_row(row) then
+    dispose_cards(row)
+    del(grid,row)
+    return check_hilos_for(grid)
+   end
+  end
+ end
+ -- check vertical hilos
+ if #grid==3 then
+  for x=1,3 do
+   local col={grid[1][x],grid[2][x],grid[3][x]}
+   if is_hilo_row(col) then
+    dispose_cards(col)
+    deli(grid[1],x)
+    deli(grid[2],x)
+    deli(grid[3],x)
+    return check_hilos_for(grid)
+   end
+  end
+ end
+ -- check diagonal hilos
+ if #grid==3 and #grid[1]==3 then
+  -- 1. top-left to bottom-right
+  local diag={grid[1][1],grid[2][2],grid[3][3]}
+  if is_hilo_row(diag) then
+   dispose_cards(diag)
+   deli(grid[1],1)
+   deli(grid[2],2)
+   deli(grid[3],3)
+   -- todo: allow vertical merge instead of horizontal
+   return
+  end
+  -- 2. bottom-left to top-right
+  diag={grid[3][1],grid[2][2],grid[1][3]}
+  if is_hilo_row(diag) then
+   dispose_cards(diag)
+   deli(grid[3],1)
+   deli(grid[2],2)
+   deli(grid[1],3)
+   -- todo: allow vertical merge instead of horizontal
+  end
+ end
+end
+
+function dispose_cards(cards)
+ local sorted_cards=sort_asc(cards)
+ set_last_card(sorted_cards[1])
+ add(deck,sorted_cards[2])
+ add(deck,sorted_cards[3])
+end
+
+function is_hilo_row(row)
+ return #row==3 and row[1].color == row[2].color == row[3].color
 end
 
 function set_card_in(grid,card,x,y)
@@ -172,6 +242,7 @@ function generate_grid()
     number=card.number,
     color=card.color
    }
+   -- todo: let the player pick which cards to reveal
    if (x==1 and y==1) or (x==3 and y==3) then
      cell.visible=true
    end
@@ -189,8 +260,8 @@ function render_grid(player,sel_x,sel_y)
  local card_height=15
  local margin=5
  rect(start_x,0,start_x+(127-margin*6)/2-1,127/2-1,6)
- for y=1,3 do
-  for x=1,3 do
+ for y=1,#grid do
+  for x=1,#grid[1] do
    local gx=start_x+margin+(x-1)*(card_width+margin)
    local gy=margin+(y-1)*(card_height+5)
    local card=grid[y][x]
