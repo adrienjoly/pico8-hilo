@@ -13,6 +13,7 @@ function _init()
 end
 
 function _update()
+ print("state before: "..state)
  if state=="player1" then
   -- pick new card or last card
   if btnp(❎) then
@@ -21,47 +22,91 @@ function _update()
   elseif btnp(🅾️) and last_card then
    state="selectedlastcard"
   end
- elseif state=="drewnewcard" or state=="discardednewcard" then
+ elseif state=="drewnewcard" then
+	 assert(new_card)
 	 -- select card in grid, to replace
 	 selection_in_grid()
 	 local selected_card=grids[1][sel_y][sel_x]
 	 if btnp(🅾️) then
-	  add(deck,selected_card)
-	  grids[1][sel_y][sel_x]=new_card
-	  grids[1][sel_y][sel_x].visible=true
+	  set_card_in(grids[1],new_card,sel_x,sel_y)
 	  new_card=nil
 	  state="player2"
 	 elseif btnp(❎) then
-	  add(deck,new_card)
+	  set_last_card(new_card)
 	  new_card=nil
 	  state="discardednewcard"
 	 end
 	elseif state=="discardednewcard" then
+	 assert(not new_card)
 	 -- select card in grid, to reveal
 	 selection_in_grid()
 	 local selected_card=grids[1][sel_y][sel_x]
-	 if btnp(🅾️) and not card.visible then
+	 if btnp(🅾️) and not selected_card.visible then
 	  selected_card.visible=true
 	  state="player2"
 	 end	
  elseif state=="selectedlastcard" then
+	 assert(last_card)
 	 -- select card in grid, to replace
 	 selection_in_grid()
 	 local selected_card=grids[1][sel_y][sel_x]
-	 if btnp(🅾️) and not selected_card.visible then
-	  add(deck,selected_card)
-	  grids[1][sel_y][sel_x]=last_card
-	  grids[1][sel_y][sel_x].visible=true
-	  last_card=nil	  
+	 if btnp(❎) then
+	  state="player1"
+	 elseif btnp(🅾️) and not selected_card.visible then
+	  set_card_in(grids[1],last_card,sel_x,sel_y)
 	  state="player2"
 	 end
+	elseif state=="player2" then
+	 -- computer/ai's turn
+	 -- dumb implem:
+	 -- d1. draw
+	 local new_card=draw_from_deck()
+	 -- d2. replace first card in grid
+	 local grid_card=pick_first_hidden(grids[2])
+  if not grid_card then
+   state="endofgame"
+  else
+   set_card_in(grids[2],new_card,sel_x,sel_y)
+   state="player1"
+  end
 	end
+ print("state after: "..state)
+end
+
+function set_card_in(grid,card,x,y)
+	local target=grid[y][x]
+ card.visible=true
+ grid[y][x]=card
+ set_last_card(target)
+end
+
+function set_last_card(card)
+	if last_card then
+	 add(deck,last_card)
+	end
+	last_card=card
+end
+
+function pick_first_hidden(grid)
+ for y=1,3 do
+  for x=1,3 do
+   local candidate=grid[y][x]
+   if not candidate.visible then
+    return {x=x,y=y,color=candidate.color,number=candidate.number}
+   end
+  end
+ end
+ return nil
 end
 
 function _draw()
  cls(0)
 	render_grid(1,sel_x,sel_y)
 	render_grid(2,-1,-1)
+	if last_card then
+	 print("last card: ",0,80,5)
+	 print(last_card.number,40,80,last_card.color)
+ end
 	print("state: "..state,0,90,5)
 	if state=="player1" then
 	 print("your turn!",0,100,6)
@@ -78,7 +123,7 @@ function _draw()
 	 print("select a card to reveal",0,100,6)
 	 print("select: ⬅️➡️⬆️⬇️🅾️",0,110,6)
 	elseif state=="selectedlastcard" then
-	 print("select: ⬅️➡️⬆️⬇️🅾️, draw: ❎",0,110,6)
+	 print("select: ⬅️➡️⬆️⬇️🅾️, cancel: ❎",0,110,6)
 	end
 end
 
